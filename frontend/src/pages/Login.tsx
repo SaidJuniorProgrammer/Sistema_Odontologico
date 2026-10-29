@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Building2, Lock, Mail, AlertCircle, Sparkles } from 'lucide-react';
 import { Role } from '../types';
 
 export const Login: React.FC = () => {
-  const { login, switchDemoUser } = useAuth();
+  const { login, switchDemoUser, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('admin@sigo.com');
   const [password, setPassword] = useState('Admin123!');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Si ya está autenticado, redirigir automáticamente al Dashboard
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,6 +23,7 @@ export const Login: React.FC = () => {
     setIsSubmitting(true);
     try {
       await login(email, password);
+      navigate('/');
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
     } finally {
@@ -28,6 +36,7 @@ export const Login: React.FC = () => {
     setIsSubmitting(true);
     try {
       await switchDemoUser(role);
+      navigate('/');
     } catch (err: any) {
       setError(err.message || 'Error con usuario de demostración');
     } finally {
