@@ -20,6 +20,29 @@ export const InteractiveOdontogram: React.FC<InteractiveOdontogramProps> = ({
   readOnly = false,
 }) => {
   const [dentitionType, setDentitionType] = useState<'PERMANENT' | 'TEMPORARY'>('PERMANENT');
+  const [notationSystem, setNotationSystem] = useState<'FDI' | 'UNIVERSAL'>('FDI');
+
+  // Mapeo FDI a Universal Americana (RF-03)
+  const fdiToUniversal: Record<number, string> = {
+    // Permanente Superior
+    18: '1', 17: '2', 16: '3', 15: '4', 14: '5', 13: '6', 12: '7', 11: '8',
+    21: '9', 22: '10', 23: '11', 24: '12', 25: '13', 26: '14', 27: '15', 28: '16',
+    // Permanente Inferior
+    38: '17', 37: '18', 36: '19', 35: '20', 34: '21', 33: '22', 32: '23', 31: '24',
+    41: '25', 42: '26', 43: '27', 44: '28', 45: '29', 46: '30', 47: '31', 48: '32',
+    // Temporal (A - T)
+    55: 'A', 54: 'B', 53: 'C', 52: 'D', 51: 'E',
+    61: 'F', 62: 'G', 63: 'H', 64: 'I', 65: 'J',
+    71: 'K', 72: 'L', 73: 'M', 74: 'N', 75: 'O',
+    81: 'P', 82: 'Q', 83: 'R', 84: 'S', 85: 'T',
+  };
+
+  const getToothLabel = (fdiNum: number) => {
+    if (notationSystem === 'UNIVERSAL') {
+      return fdiToUniversal[fdiNum] || String(fdiNum);
+    }
+    return String(fdiNum);
+  };
 
   // Notación FDI permanente:
   // Cuadrante 1: 18 - 11 | Cuadrante 2: 21 - 28 (Superior)
@@ -52,9 +75,14 @@ export const InteractiveOdontogram: React.FC<InteractiveOdontogramProps> = ({
 
     return (
       <div key={num} className="flex flex-col items-center p-1.5 group select-none">
-        <span className="text-xs font-bold text-slate-700 mb-1 group-hover:text-teal-600 transition">
-          {num}
-        </span>
+        <div className="flex items-center gap-1 mb-1">
+          <span className="text-xs font-bold text-slate-700 group-hover:text-teal-600 transition">
+            {getToothLabel(num)}
+          </span>
+          {notationSystem === 'UNIVERSAL' && (
+            <span className="text-[9px] text-slate-400 font-medium">({num})</span>
+          )}
+        </div>
 
         {/* Contenedor del Diente con SVG de 5 Caras */}
         <div className="relative w-12 h-12 bg-white rounded-lg shadow-sm border border-slate-300 flex items-center justify-center p-1 hover:border-teal-500 transition">
@@ -184,33 +212,66 @@ export const InteractiveOdontogram: React.FC<InteractiveOdontogramProps> = ({
 
   return (
     <div className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200">
-      {/* Selector Dentición Permanente vs Temporal */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
+      {/* Selectores Nomenclatura & Dentición (RF-03) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-200">
         <div>
-          <h4 className="text-sm font-bold text-slate-800">Odontograma Anatómico 2D (Notación FDI)</h4>
-          <p className="text-xs text-slate-500">Selecciona una superficie para aplicar diagnóstico o tratamiento</p>
+          <h4 className="text-sm font-bold text-slate-800">
+            Odontograma Anatómico 2D ({notationSystem === 'FDI' ? 'Notación Internacional FDI' : 'Notación Universal Americana'})
+          </h4>
+          <p className="text-xs text-slate-500">
+            Haga clic en una superficie para aplicar diagnóstico o en "Estado" para tratamientos integrales
+          </p>
         </div>
-        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
-          <button
-            onClick={() => setDentitionType('PERMANENT')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-              dentitionType === 'PERMANENT'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Permanente (32 dientes)
-          </button>
-          <button
-            onClick={() => setDentitionType('TEMPORARY')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-              dentitionType === 'TEMPORARY'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Temporal / Decidua (20 dientes)
-          </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Selector de Nomenclatura FDI vs Universal (RF-03) */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
+            <span className="text-[11px] font-semibold text-slate-400 px-2">Sistema:</span>
+            <button
+              onClick={() => setNotationSystem('FDI')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                notationSystem === 'FDI'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              FDI
+            </button>
+            <button
+              onClick={() => setNotationSystem('UNIVERSAL')}
+              className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                notationSystem === 'UNIVERSAL'
+                  ? 'bg-slate-800 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Universal (1-32 / A-T)
+            </button>
+          </div>
+
+          {/* Selector Permanente vs Temporal */}
+          <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
+            <button
+              onClick={() => setDentitionType('PERMANENT')}
+              className={`px-3 py-1 rounded-lg font-semibold transition ${
+                dentitionType === 'PERMANENT'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Permanente
+            </button>
+            <button
+              onClick={() => setDentitionType('TEMPORARY')}
+              className={`px-3 py-1 rounded-lg font-semibold transition ${
+                dentitionType === 'TEMPORARY'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Temporal
+            </button>
+          </div>
         </div>
       </div>
 

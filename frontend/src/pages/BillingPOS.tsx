@@ -15,8 +15,10 @@ import { api } from '../services/api';
 import { CashShift, Invoice, Patient, PaymentMethod } from '../types';
 
 export const BillingPOS: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'POS' | 'COMMISSIONS'>('POS');
   const [currentShift, setCurrentShift] = useState<CashShift | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [commissions, setCommissions] = useState<any[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,15 +39,17 @@ export const BillingPOS: React.FC = () => {
   const loadBillingData = async () => {
     try {
       setLoading(true);
-      const [shiftRes, invRes, patRes] = await Promise.all([
+      const [shiftRes, invRes, patRes, comRes] = await Promise.all([
         api.getCurrentShift(),
         api.getInvoices(),
         api.getPatients(),
+        api.getCommissions().catch(() => ({ commissions: [] })),
       ]);
 
       setCurrentShift(shiftRes.shift);
       setInvoices(invRes.invoices || []);
       setPatients(patRes.patients || []);
+      setCommissions(comRes.commissions || []);
       if (patRes.patients?.length > 0 && !invoiceForm.patientId) {
         setInvoiceForm((prev) => ({ ...prev, patientId: patRes.patients[0].id }));
       }
@@ -120,8 +124,33 @@ export const BillingPOS: React.FC = () => {
         </div>
       </div>
 
-      {/* Panel de Caja Diaria (RN-02) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Selector de Pestaña: POS / Caja vs Liquidación de Honorarios (RF-13) */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        <button
+          onClick={() => setActiveTab('POS')}
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+            activeTab === 'POS'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Receipt className="w-4 h-4" /> Punto de Venta & Caja Ciega (RN-02)
+        </button>
+        <button
+          onClick={() => setActiveTab('COMMISSIONS')}
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
+            activeTab === 'COMMISSIONS'
+              ? 'bg-teal-600 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <DollarSign className="w-4 h-4" /> Liquidación de Honorarios & Comisiones (RF-13)
+        </button>
+      </div>
+
+      {activeTab === 'POS' ? (
+        /* Panel de Caja Diaria (RN-02) */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Estado y Arqueo Ciego */}
         <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -385,6 +414,58 @@ export const BillingPOS: React.FC = () => {
           </div>
         </div>
       </div>
+      ) : (
+        /* Vista de Liquidación de Honorarios & Comisiones Médicas (RF-13) */
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+          <div>
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-teal-600" />
+              Liquidación y Cálculo de Honorarios Profesionales (RF-13)
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Liquidación configurable de comisiones a odontólogos según procedimientos atendidos y reglas de porcentaje
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase bg-slate-50/50">
+                  <th className="p-3">Profesional Odontólogo</th>
+                  <th className="p-3">Especialidad</th>
+                  <th className="p-3">Cédula / Registro</th>
+                  <th className="p-3">Citas / Procedimientos</th>
+                  <th className="p-3">% Comisión Pactado</th>
+                  <th className="p-3 font-bold text-slate-800">Total Liquidación ($USD)</th>
+                  <th className="p-3 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {commissions.map((c) => (
+                  <tr key={c.dentistId} className="hover:bg-slate-50 transition">
+                    <td className="p-3 font-bold text-slate-800">{c.dentistName}</td>
+                    <td className="p-3 text-slate-600">{c.specialty}</td>
+                    <td className="p-3 text-slate-400 font-mono">{c.licenseNumber}</td>
+                    <td className="p-3 font-bold text-teal-700">{c.completedAppointments} realizadas</td>
+                    <td className="p-3 font-semibold text-slate-700">{c.commissionRatePercent}%</td>
+                    <td className="p-3 font-black text-slate-900 text-sm">
+                      ${c.estimatedHonoraries.toFixed(2)}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => alert(`Liquidación de $${c.estimatedHonoraries.toFixed(2)} procesada para ${c.dentistName}`)}
+                        className="px-3 py-1.5 bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold rounded-lg text-xs transition border border-teal-200"
+                      >
+                        Generar Pago
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

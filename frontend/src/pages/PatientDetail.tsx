@@ -12,7 +12,9 @@ import {
   Plus,
   Lock,
   Stamp,
-  User as UserIcon,
+  Activity,
+  PenTool,
+  Printer,
 } from 'lucide-react';
 import { api } from '../services/api';
 import {
@@ -20,17 +22,22 @@ import {
   ToothSurface,
   SurfaceCondition,
   ToothGeneralCondition,
-  EvolutionNote,
-  TreatmentPlan,
 } from '../types';
 import { InteractiveOdontogram } from '../components/odontogram/InteractiveOdontogram';
+import { InteractivePeriodontogram } from '../components/periodontogram/InteractivePeriodontogram';
+import { DigitalConsentPad } from '../components/consent/DigitalConsentPad';
 import { useAuth } from '../context/AuthContext';
 
 export const PatientDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [activeTab, setActiveTab] = useState<'ODONTOGRAM' | 'EVOLUTION' | 'TREATMENT' | 'APPOINTMENTS'>('ODONTOGRAM');
+  const [periodontalEntries, setPeriodontalEntries] = useState<any[]>([]);
+  const [consents, setConsents] = useState<any[]>([]);
+  const [showConsentModal, setShowConsentModal] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<
+    'ODONTOGRAM' | 'PERIODONTOGRAM' | 'EVOLUTION' | 'CONSENTS' | 'TREATMENT' | 'APPOINTMENTS'
+  >('ODONTOGRAM');
   const [loading, setLoading] = useState(true);
 
   // Modal para superficie dental
@@ -67,8 +74,14 @@ export const PatientDetail: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const res = await api.getPatientById(id);
-      setPatient(res.patient);
+      const [patRes, perioRes, consentRes] = await Promise.all([
+        api.getPatientById(id),
+        api.getPeriodontogram(id).catch(() => ({ periodontogram: [] })),
+        api.getPatientConsents(id).catch(() => ({ consents: [] })),
+      ]);
+      setPatient(patRes.patient);
+      setPeriodontalEntries(perioRes.periodontogram || []);
+      setConsents(consentRes.consents || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -232,46 +245,76 @@ export const PatientDetail: React.FC = () => {
       </div>
 
       {/* Pestañas de Navegación del Expediente */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setActiveTab('ODONTOGRAM')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              activeTab === 'ODONTOGRAM'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Smile className="w-4 h-4" /> Odontograma (RF-03)
+          </button>
+          <button
+            onClick={() => setActiveTab('PERIODONTOGRAM')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              activeTab === 'PERIODONTOGRAM'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Activity className="w-4 h-4" /> Periodontograma (RF-04)
+          </button>
+          <button
+            onClick={() => setActiveTab('EVOLUTION')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              activeTab === 'EVOLUTION'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <FileText className="w-4 h-4" /> Evolución SOEP (RN-01)
+          </button>
+          <button
+            onClick={() => setActiveTab('CONSENTS')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              activeTab === 'CONSENTS'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <PenTool className="w-4 h-4" /> Consentimientos (RF-06)
+          </button>
+          <button
+            onClick={() => setActiveTab('TREATMENT')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              activeTab === 'TREATMENT'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <DollarSign className="w-4 h-4" /> Presupuestos (RF-07)
+          </button>
+          <button
+            onClick={() => setActiveTab('APPOINTMENTS')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 ${
+              activeTab === 'APPOINTMENTS'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Clock className="w-4 h-4" /> Citas
+          </button>
+        </div>
+
         <button
-          onClick={() => setActiveTab('ODONTOGRAM')}
-          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
-            activeTab === 'ODONTOGRAM'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          onClick={() => window.print()}
+          className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition flex items-center gap-1 text-xs"
+          title="Imprimir Expediente Clínico"
         >
-          <Smile className="w-4 h-4" /> Odontograma 2D (RF-03)
-        </button>
-        <button
-          onClick={() => setActiveTab('EVOLUTION')}
-          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
-            activeTab === 'EVOLUTION'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <FileText className="w-4 h-4" /> Evolución SOEP & Adendas (RN-01)
-        </button>
-        <button
-          onClick={() => setActiveTab('TREATMENT')}
-          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
-            activeTab === 'TREATMENT'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <DollarSign className="w-4 h-4" /> Presupuestos (RF-07)
-        </button>
-        <button
-          onClick={() => setActiveTab('APPOINTMENTS')}
-          className={`px-4 py-2 rounded-xl transition flex items-center gap-2 ${
-            activeTab === 'APPOINTMENTS'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Clock className="w-4 h-4" /> Historial Citas
+          <Printer className="w-3.5 h-3.5" /> Imprimir Ficha
         </button>
       </div>
 
@@ -284,6 +327,89 @@ export const PatientDetail: React.FC = () => {
             onToothGeneralClick={handleToothGeneralClick}
             readOnly={user?.role === 'AUDITOR'}
           />
+        </div>
+      )}
+
+      {/* CONTENIDO TAB: PERIODONTOGRAMA DIGITAL (RF-04) */}
+      {activeTab === 'PERIODONTOGRAM' && (
+        <InteractivePeriodontogram
+          patientId={patient.id}
+          initialEntries={periodontalEntries}
+          onRefresh={loadPatientData}
+          readOnly={user?.role === 'AUDITOR'}
+        />
+      )}
+
+      {/* CONTENIDO TAB: CONSENTIMIENTOS INFORMADOS DIGITALES (RF-06) */}
+      {activeTab === 'CONSENTS' && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <PenTool className="w-5 h-5 text-teal-600" />
+                Consentimientos Informados Digitales (RF-06)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Formatos legales por procedimiento con captura de firma biométrica en tablet o pantalla táctil
+              </p>
+            </div>
+            {user?.role !== 'AUDITOR' && (
+              <button
+                onClick={() => setShowConsentModal(true)}
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-md shadow-teal-600/20"
+              >
+                <Plus className="w-4 h-4" /> Emitir y Firmar Consentimiento
+              </button>
+            )}
+          </div>
+
+          {consents.length === 0 ? (
+            <div className="text-center py-12 text-slate-400 text-sm">
+              No se han emitido consentimientos informados para este paciente aún.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {consents.map((consent) => (
+                <div
+                  key={consent.id}
+                  className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800 text-sm">{consent.procedureName}</span>
+                    <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                      FIRMADO LEGALMENTE
+                    </span>
+                  </div>
+
+                  <p className="text-slate-600 leading-relaxed bg-white p-3 rounded-xl border border-slate-200 text-[11px]">
+                    {consent.termsText}
+                  </p>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200">
+                    <div>
+                      <div className="font-semibold text-slate-700">
+                        Dr/Dra. {consent.dentist?.firstName} {consent.dentist?.lastName}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {new Date(consent.signedAt || consent.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                    {/* Trazo Biométrico Firmado */}
+                    {consent.signatureData && (
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 block mb-0.5">Firma Biometríca:</span>
+                        <img
+                          src={consent.signatureData}
+                          alt="Firma"
+                          className="h-9 max-w-[120px] bg-white p-1 rounded border border-slate-300"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -713,6 +839,16 @@ export const PatientDetail: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal de Consentimiento Informado con Firma Biométrica (RF-06) */}
+      {showConsentModal && (
+        <DigitalConsentPad
+          patientId={patient.id}
+          patientName={`${patient.firstName} ${patient.lastName}`}
+          onConsentCreated={loadPatientData}
+          onClose={() => setShowConsentModal(false)}
+        />
       )}
     </div>
   );

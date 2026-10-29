@@ -5,6 +5,7 @@ import {
   closeBlindShift,
   createInvoice,
   getInvoices,
+  getCommissionsReport,
 } from './billing.controller.js';
 import { authenticateToken } from '../../middleware/auth.js';
 
@@ -17,5 +18,6 @@ router.post('/shifts/open', openShift);
 router.post('/shifts/close', closeBlindShift);
 router.post('/invoices', createInvoice);
 router.get('/invoices', getInvoices);
+router.get('/commissions', getCommissionsReport);
 
 export default router;

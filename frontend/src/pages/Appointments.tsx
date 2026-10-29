@@ -12,6 +12,7 @@ import {
   X,
   Play,
   CheckCheck,
+  MessageSquare,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { Appointment, DentalChair, Patient, AppointmentStatus } from '../types';
@@ -122,6 +123,27 @@ export const Appointments: React.FC = () => {
     ATENDIDO: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     CANCELADO: 'bg-rose-50 text-rose-700 border-rose-200',
     NO_ASISTIO: 'bg-slate-100 text-slate-700 border-slate-300',
+  };
+
+  const sendWhatsAppReminder = (app: Appointment) => {
+    const patientName = `${app.patient?.firstName} ${app.patient?.lastName}`;
+    const phone = (app.patient?.phone || '').replace(/[^0-9]/g, '');
+    const dateStr = new Date(app.startDateTime).toLocaleDateString([], {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+    const timeStr = new Date(app.startDateTime).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const chairName = app.dentalChair?.name || 'Sillón Principal';
+    const doctorName = `Dr/Dra. ${app.dentist?.firstName} ${app.dentist?.lastName}`;
+
+    const message = `🦷 *Recordatorio de Cita - SIGO-Dental*\n\nEstimado/a *${patientName}*,\nLe recordamos su cita odontológica:\n📅 *Fecha:* ${dateStr}\n⏰ *Hora:* ${timeStr}\n💺 *Ubicación:* ${chairName}\n👨‍⚕️ *Profesional:* ${doctorName}\n📋 *Procedimiento:* ${app.reason}\n\nPor favor responda a este mensaje para *CONFIRMAR* o coordinar cualquier cambio. ¡Le esperamos!`;
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -249,8 +271,16 @@ export const Appointments: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Transición de Estados del Turno (RF-10) */}
+                {/* Transición de Estados del Turno (RF-10) y WhatsApp (RF-11) */}
                 <div className="flex items-center gap-1.5 self-end md:self-center">
+                  <button
+                    onClick={() => sendWhatsAppReminder(app)}
+                    className="p-1.5 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition border border-emerald-200"
+                    title="Enviar Recordatorio por WhatsApp (RF-11)"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                  </button>
+
                   {app.status === 'PROGRAMADO' && (
                     <button
                       onClick={() => handleUpdateStatus(app.id, 'CONFIRMADO')}

@@ -87,6 +87,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // Periodontogram (RF-04)
+  getPeriodontogram: (patientId: string) =>
+    request<{ periodontogram: any[] }>(`/odontogram/periodontogram/patient/${patientId}`),
+  savePeriodontalMeasurement: (data: any) =>
+    request<{ message: string; entry: any }>('/odontogram/periodontogram', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   // Evolution & SOEP (RN-01)
   getPatientEvolutions: (patientId: string) =>
     request<{ notes: any[] }>(`/evolution/patient/${patientId}`),
@@ -101,18 +110,13 @@ export const api = {
       body: JSON.stringify({ content }),
     }),
 
-  // Treatments & Budgets
-  getPatientTreatments: (patientId: string) =>
-    request<{ treatments: any[] }>(`/treatments/patient/${patientId}`),
-  createTreatmentPlan: (data: any) =>
-    request<{ message: string; treatmentPlan: any }>('/treatments', {
+  // Informed Consents (RF-06)
+  getPatientConsents: (patientId: string) =>
+    request<{ consents: any[] }>(`/evolution/consents/patient/${patientId}`),
+  createInformedConsent: (data: any) =>
+    request<{ message: string; consent: any }>('/evolution/consents', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
-  updateTreatmentStatus: (id: string, status: string) =>
-    request<{ message: string; plan: any }>(`/treatments/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
     }),
 
   // Billing & Blind Cash Close (RN-02)
@@ -133,6 +137,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
   getInvoices: () => request<{ invoices: any[] }>('/billing/invoices'),
+  getCommissions: () => request<{ commissions: any[] }>('/billing/commissions'),
 
   // Inventory (RF-14)
   getInventory: () => request<{ inventory: any[] }>('/inventory'),
