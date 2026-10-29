@@ -1,0 +1,562 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+  DENTIST
+  ASSISTANT
+  AUDITOR
+}
+
+enum AppointmentStatus {
+  PROGRAMADO
+  CONFIRMADO
+  EN_SALA
+  EN_ATENCION
+  ATENDIDO
+  CANCELADO
+  NO_ASISTIO
+}
+
+enum NotationType {
+  FDI
+  UNIVERSAL
+}
+
+enum DentitionType {
+  PERMANENT
+  TEMPORARY
+}
+
+enum ToothSurface {
+  MESIAL
+  DISTAL
+  OCLUSAL
+  VESTIBULAR
+  LINGUAL
+}
+
+enum SurfaceCondition {
+  CARIES
+  RESTAURACION_RESINA
+  RESTAURACION_AMALGAMA
+  SELLANTE
+  FRACTURA
+  INCRUSTACION
+}
+
+enum ToothGeneralCondition {
+  SANO
+  AUSENTE
+  CORONA
+  ENDODONCIA
+  IMPLANTE
+  PROTESIS_FIJA
+  PROTESIS_REMOVIBLE
+  DIENTE_ERUPCION
+  EXTRACCION_INDICADA
+}
+
+enum AlertSeverity {
+  CRITICAL
+  MODERATE
+  MILD
+}
+
+enum TreatmentStatus {
+  DRAFT
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  TRANSFER
+  INSURANCE
+}
+
+enum InvoiceStatus {
+  PAID
+  PARTIAL
+  CANCELLED
+}
+
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+}
+
+// -------------------------------------------------------------
+// 1. Usuarios, Roles & Control de Acceso (RBAC)
+// -------------------------------------------------------------
+model User {
+  id              String       @id @default(uuid())
+  email           String       @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  phone           String?
+  role            Role         @default(RECEPTIONIST)
+  specialty       String?      // Solo para DENTIST
+  licenseNumber   String?      // Cédula profesional
+  active          Boolean      @default(true)
+  lastLogin       DateTime?
+  twoFactorSecret String?
+  isMfaEnabled    Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  // Relaciones
+  dentistAppointments   Appointment[]   @relation("DentistAppointments")
+  dentistOdontograms    Odontogram[]    @relation("DentistOdontograms")
+  dentistPeriodontograms Periodontogram[] @relation("DentistPeriodontograms")
+  dentistTreatments     TreatmentPlan[] @relation("DentistTreatments")
+  evolutionNotes        EvolutionNote[] @relation("DentistEvolutions")
+  evolutionAddendums    EvolutionAddendum[]
+  consentsSupervised    InformedConsent[]
+  cashShifts            CashShift[]
+  commissions           DentistCommission[]
+  auditLogs             AuditLog[]
+  stockMovements        StockMovement[]
+
+  @@map("users")
+}
+
+// -------------------------------------------------------------
+// 2. Pacientes & Antecedentes Médicos (RF-01, RF-02)
+// -------------------------------------------------------------
+model Patient {
+  id                    String         @id @default(uuid())
+  documentType          String         @default("DNI") // DNI, Pasaporte, etc.
+  identification        String         @unique
+  firstName             String
+  lastName              String
+  birthDate             DateTime
+  gender                String         // M, F, Otro
+  email                 String?
+  phone                 String
+  address               String?
+  city                  String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  legalGuardianName     String?        // Si es menor de edad
+  legalGuardianPhone    String?
+  insuranceProvider     String?        // Seguro dental
+  insurancePolicyNumber String?
+  allergiesSummary      String?
+  bloodType             String?
+  notes                 String?
+  active                Boolean        @default(true)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // Relaciones
+  medicalAlerts         MedicalAlert[]
+  appointments          Appointment[]
+  odontograms           Odontogram[]
+  periodontograms       Periodontogram[]
+  evolutionNotes        EvolutionNote[]
+  treatmentPlans        TreatmentPlan[]
+  informedConsents      InformedConsent[]
+  invoices              Invoice[]
+
+  @@map("patients")
+}
+
+model MedicalAlert {
+  id                 String        @id @default(uuid())
+  patientId          String
+  patient            Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  conditionName      String        // ej. Alergia a Penicilina, Anticoagulado, Diabetes
+  severity           AlertSeverity @default(CRITICAL)
+  requiresPremedication Boolean   @default(false)
+  notes              String?
+  active             Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+
+  @@map("medical_alerts")
+}
+
+// -------------------------------------------------------------
+// 3. Infraestructura Clínica & Citas (RF-09, RF-10, RN-03)
+// -------------------------------------------------------------
+model DentalChair {
+  id           String        @id @default(uuid())
+  name         String        // Ej: Sillón 1 - Box A
+  roomNumber   String
+  description  String?
+  active       Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  appointments Appointment[]
+
+  @@map("dental_chairs")
+}
+
+model Appointment {
+  id                 String            @id @default(uuid())
+  patientId          String
+  patient            Patient           @relation(fields: [patientId], references: [id])
+  dentistId          String
+  dentist            User              @relation("DentistAppointments", fields: [dentistId], references: [id])
+  dentalChairId      String
+  dentalChair        DentalChair       @relation(fields: [dentalChairId], references: [id])
+  startDateTime      DateTime
+  endDateTime        DateTime
+  status             AppointmentStatus @default(PROGRAMADO)
+  reason             String
+  notes              String?
+  cancellationReason String?
+  confirmedAt        DateTime?
+  arrivedAt          DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  evolutionNotes     EvolutionNote[]
+
+  @@map("appointments")
+}
+
+// -------------------------------------------------------------
+// 4. Odontograma, Periodontograma & Ficha Clínica (RF-03, RF-04)
+// -------------------------------------------------------------
+model Odontogram {
+  id             String        @id @default(uuid())
+  patientId      String
+  patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  dentistId      String
+  dentist        User          @relation("DentistOdontograms", fields: [dentistId], references: [id])
+  notationType   NotationType  @default(FDI)
+  dentitionType  DentitionType @default(PERMANENT)
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  teeth          ToothRecord[]
+
+  @@map("odontograms")
+}
+
+model ToothRecord {
+  id               String                 @id @default(uuid())
+  odontogramId     String
+  odontogram       Odontogram             @relation(fields: [odontogramId], references: [id], onDelete: Cascade)
+  toothNumber      Int                    // ej. 11, 18, 51, 85
+  generalCondition ToothGeneralCondition  @default(SANO)
+  notes            String?
+
+  surfaces         ToothSurfaceRecord[]
+
+  @@unique([odontogramId, toothNumber])
+  @@map("tooth_records")
+}
+
+model ToothSurfaceRecord {
+  id            String           @id @default(uuid())
+  toothRecordId String
+  toothRecord   ToothRecord      @relation(fields: [toothRecordId], references: [id], onDelete: Cascade)
+  surface       ToothSurface
+  condition     SurfaceCondition
+  colorCode     String           // #EF4444 (rojo caries), #3B82F6 (azul resina), etc.
+  notes         String?
+
+  @@unique([toothRecordId, surface])
+  @@map("tooth_surface_records")
+}
+
+model Periodontogram {
+  id                 String    @id @default(uuid())
+  patientId          String
+  patient            Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  dentistId          String
+  dentist            User      @relation("DentistPeriodontograms", fields: [dentistId], references: [id])
+  evaluationDate     DateTime  @default(now())
+  toothNumber        Int
+  site               String    // MV, V, DV, ML, L, DL (6 puntos por diente)
+  pocketDepthMm      Int       // Profundidad al sondaje
+  gingivalMarginMm   Int       // Margen gingival
+  clinicalAttachmentLevel Int  // Nivel de Inserción Clínica (NIC)
+  furcationGrade     Int?      // Grado 0-3
+  mobilityGrade      Int?      // Grado 0-3
+  bleedingOnProbing  Boolean   @default(false)
+  suppuration        Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+
+  @@map("periodontograms")
+}
+
+// -------------------------------------------------------------
+// 5. Evolución Clínica SOEP & Consentimiento (RF-05, RF-06, RN-01)
+// -------------------------------------------------------------
+model EvolutionNote {
+  id               String               @id @default(uuid())
+  patientId        String
+  patient          Patient              @relation(fields: [patientId], references: [id])
+  dentistId        String
+  dentist          User                 @relation("DentistEvolutions", fields: [dentistId], references: [id])
+  appointmentId    String?
+  appointment      Appointment?         @relation(fields: [appointmentId], references: [id])
+  subjective       String               // Motivo referido, síntomas
+  objective        String               // Signos clínicos, hallazgos
+  evaluation       String               // Diagnóstico odontológico
+  plan             String               // Procedimiento ejecutado y próximos pasos
+  digitalSignature String?              // Hash de firma o certificado
+  isLocked         Boolean              @default(false)
+  lockedAt         DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  addendums        EvolutionAddendum[]
+
+  @@map("evolution_notes")
+}
+
+model EvolutionAddendum {
+  id              String        @id @default(uuid())
+  evolutionNoteId String
+  evolutionNote   EvolutionNote @relation(fields: [evolutionNoteId], references: [id])
+  authorId        String
+  author          User          @relation(fields: [authorId], references: [id])
+  content         String
+  digitalSignature String?
+  createdAt       DateTime      @default(now())
+
+  @@map("evolution_addendums")
+}
+
+model InformedConsent {
+  id            String    @id @default(uuid())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  dentistId     String
+  dentist       User      @relation(fields: [dentistId], references: [id])
+  procedureName String
+  termsText     String
+  signedAt      DateTime?
+  signatureData String?   // Base64 image de trazo biométrico o token OTP
+  signatureType String    @default("BIOMETRIC") // BIOMETRIC, OTP
+  status        String    @default("PENDING")   // PENDING, SIGNED, REJECTED
+  createdAt     DateTime  @default(now())
+
+  @@map("informed_consents")
+}
+
+// -------------------------------------------------------------
+// 6. Planes de Tratamiento & Presupuestos (RF-07, RF-08)
+// -------------------------------------------------------------
+model TreatmentPlan {
+  id             String               @id @default(uuid())
+  patientId      String
+  patient        Patient              @relation(fields: [patientId], references: [id])
+  dentistId      String
+  dentist        User                 @relation("DentistTreatments", fields: [dentistId], references: [id])
+  title          String
+  status         TreatmentStatus      @default(DRAFT)
+  totalCost      Decimal              @default(0.00) @db.Decimal(10, 2)
+  discountRate   Decimal              @default(0.00) @db.Decimal(5, 2)
+  finalAmount    Decimal              @default(0.00) @db.Decimal(10, 2)
+  notes          String?
+  approvedAt     DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  phases         TreatmentPlanPhase[]
+
+  @@map("treatment_plans")
+}
+
+model TreatmentPlanPhase {
+  id              String          @id @default(uuid())
+  treatmentPlanId String
+  treatmentPlan   TreatmentPlan   @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  phaseNumber     Int
+  name            String          // Ej: Fase 1 - Higiene y Restauraciones
+  isCompleted     Boolean         @default(false)
+
+  items           TreatmentItem[]
+
+  @@map("treatment_plan_phases")
+}
+
+model TreatmentItem {
+  id                   String              @id @default(uuid())
+  treatmentPlanPhaseId String
+  treatmentPlanPhase   TreatmentPlanPhase  @relation(fields: [treatmentPlanPhaseId], references: [id], onDelete: Cascade)
+  toothNumber          Int?
+  procedureCode        String?
+  procedureName        String
+  category             String              // Ej: Operatoria, Endodoncia, Periodoncia, Cirugia
+  unitCost             Decimal             @db.Decimal(10, 2)
+  quantity             Int                 @default(1)
+  discount             Decimal             @default(0.00) @db.Decimal(10, 2)
+  totalCost            Decimal             @db.Decimal(10, 2)
+  isApproved           Boolean             @default(true)
+  isCompleted          Boolean             @default(false)
+  completedAt          DateTime?
+
+  commissions          DentistCommission[]
+
+  @@map("treatment_items")
+}
+
+// -------------------------------------------------------------
+// 7. Facturación, Pagos & Cierre de Caja Ciego (RF-12, RN-02)
+// -------------------------------------------------------------
+model Invoice {
+  id                 String          @id @default(uuid())
+  invoiceNumber      String          @unique
+  patientId          String
+  patient            Patient         @relation(fields: [patientId], references: [id])
+  cashierId          String
+  issueDate          DateTime        @default(now())
+  subtotal           Decimal         @db.Decimal(10, 2)
+  taxRate            Decimal         @default(0.00) @db.Decimal(5, 2)
+  taxAmount          Decimal         @default(0.00) @db.Decimal(10, 2)
+  totalAmount        Decimal         @db.Decimal(10, 2)
+  status             InvoiceStatus   @default(PAID)
+  fiscalTicketNumber String?
+  notes              String?
+  createdAt          DateTime        @default(now())
+
+  payments           Payment[]
+  commissions        DentistCommission[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  invoiceId     String
+  invoice       Invoice       @relation(fields: [invoiceId], references: [id])
+  paymentMethod PaymentMethod
+  amount        Decimal       @db.Decimal(10, 2)
+  referenceCode String?
+  receivedAt    DateTime      @default(now())
+
+  @@map("payments")
+}
+
+model CashShift {
+  id                   String      @id @default(uuid())
+  cashierId            String
+  cashier              User        @relation(fields: [cashierId], references: [id])
+  openedAt             DateTime    @default(now())
+  closedAt             DateTime?
+  initialCash          Decimal     @db.Decimal(10, 2)
+  // RN-02: Cierre ciego: El cajero ingresa countedCash sin ver systemCalculatedCash antes
+  countedCash          Decimal?    @db.Decimal(10, 2)
+  systemCalculatedCash Decimal?    @db.Decimal(10, 2)
+  difference           Decimal?    @db.Decimal(10, 2)
+  status               ShiftStatus @default(OPEN)
+  notes                String?
+
+  @@map("cash_shifts")
+}
+
+// -------------------------------------------------------------
+// 8. Comisiones Odontólogos & Descargo de Stock (RF-13, RF-14)
+// -------------------------------------------------------------
+model DentistCommission {
+  id              String         @id @default(uuid())
+  dentistId       String
+  dentist         User           @relation(fields: [dentistId], references: [id])
+  treatmentItemId String?
+  treatmentItem   TreatmentItem? @relation(fields: [treatmentItemId], references: [id])
+  invoiceId       String?
+  invoice         Invoice?       @relation(fields: [invoiceId], references: [id])
+  commissionRate  Decimal        @db.Decimal(5, 2) // Porcentaje ej. 40.00%
+  baseAmount      Decimal        @db.Decimal(10, 2)
+  calculatedAmount Decimal       @db.Decimal(10, 2)
+  isPaid          Boolean        @default(false)
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@map("dentist_commissions")
+}
+
+model InventoryItem {
+  id                String          @id @default(uuid())
+  code              String          @unique
+  name              String
+  category          String
+  unitOfMeasure     String          // Unidad, Frasco, Tubo, Caja
+  stockQuantity     Decimal         @db.Decimal(10, 2)
+  minStockThreshold Decimal         @db.Decimal(10, 2)
+  costPerUnit       Decimal         @db.Decimal(10, 2)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  consumptions      ProcedureInventoryConsumption[]
+  stockMovements    StockMovement[]
+
+  @@map("inventory_items")
+}
+
+model ProcedureInventoryConsumption {
+  id              String        @id @default(uuid())
+  procedureName   String
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  defaultQuantity Decimal       @db.Decimal(10, 2)
+
+  @@map("procedure_inventory_consumptions")
+}
+
+model StockMovement {
+  id              String        @id @default(uuid())
+  inventoryItemId String
+  inventoryItem   InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  movementType    String        // ENTRADA, SALIDA_CLINICA, AJUSTE
+  quantity        Decimal       @db.Decimal(10, 2)
+  reference       String?       // No. Procedimiento o factura de compra
+  createdById     String
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now())
+
+  @@map("stock_movements")
+}
+
+// -------------------------------------------------------------
+// 9. Registro de Auditoría Inmutable (RNF-06)
+// -------------------------------------------------------------
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityName String      // ej. Patient, Appointment, Odontogram
+  entityId   String?
+  ipAddress  String?
+  userAgent  String?
+  details    Json?       // Valores previos y nuevos para trazabilidad completa
+  timestamp  DateTime    @default(now())
+
+  @@index([entityName, entityId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}

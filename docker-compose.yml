@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sigo_dental_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sigo_user
+      POSTGRES_PASSWORD: sigo_secure_password
+      POSTGRES_DB: sigo_dental
+    ports:
+      - "5435:5432"
+    volumes:
+      - sigo_pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: sigo_dental_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - sigo_redis_data:/data
+
+volumes:
+  sigo_pg_data:
+  sigo_redis_data:
